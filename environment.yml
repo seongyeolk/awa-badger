@@ -1,0 +1,10 @@
+# conda env create -f environment.yml
+name: awa-badger
+channels:
+  - conda-forge
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+      - git+https://github.com/ChristopherMayes/Xopt/
+      - git+https://github.com/SLAC-ML/Badger/
