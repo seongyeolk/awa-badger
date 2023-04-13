@@ -5,6 +5,8 @@ channels:
 dependencies:
   - python=3.9
   - pip
+  - matplotlib
   - pip:
+      - pyepics
       - git+https://github.com/ChristopherMayes/Xopt/
       - git+https://github.com/SLAC-ML/Badger/

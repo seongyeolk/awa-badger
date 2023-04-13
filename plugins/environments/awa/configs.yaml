@@ -1,0 +1,8 @@
+---
+name: AWA
+description: "AWA control system"
+version: "0.1"
+dependencies:
+  - numpy
+interface:
+  - awa_interface
