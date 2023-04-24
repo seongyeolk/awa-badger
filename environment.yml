@@ -6,6 +6,7 @@ dependencies:
   - python=3.9
   - pip
   - matplotlib
+  - pytest
   - pip:
       - pyepics
       - git+https://github.com/ChristopherMayes/Xopt/
