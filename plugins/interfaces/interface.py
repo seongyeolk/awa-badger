@@ -47,7 +47,7 @@ def validate_observable_names(func):
 class Interface(BaseModel, ABC):
     name: str
     variables: Dict[str, conlist(float, min_items=2, max_items=2)]
-    observables: List
+    observables: list
     params: Dict = Field({}, description="custom parameters")
 
     class Config:

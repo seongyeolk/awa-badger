@@ -1,21 +1,26 @@
 from typing import List, Dict
 
 from epics import caget, caput, caget_many
+from pydantic import conlist
 
+from plugins.interfaces.camera import AWACamera
 from plugins.interfaces.interface import Interface
-from camera import AWACamera
 
 
 class AWAInterface(Interface):
     name = "awa_interface"
-    variables = {}
-    observables = []
+    variables: Dict[str, conlist(float, min_items=2, max_items=2)] = {
+        "x": [0, 1],
+        "y": [0, 2]
+    }
+    observables = [
+        "AWAICTMon:Ch1",
+        "AWAICTMon:Ch2",
+        "AWAICTMon:Ch3",
+        "AWAICTMon:Ch4"
+    ]
 
-    def __init__(self):
-        super().__init__()
-
-        # initalize frame grabber camera
-        self.camera_app = AWACamera()
+    camera_app: AWACamera = None  # AWACamera("")
 
     def get_variables(self, variable_names: List[str]) -> Dict:
         values = {}
@@ -41,6 +46,4 @@ class AWAInterface(Interface):
         else:
             measurements = caget_many(observable_names)
 
-
         return measurements
-
