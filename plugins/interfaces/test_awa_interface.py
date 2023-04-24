@@ -2,16 +2,13 @@ from typing import Dict, List
 
 from pydantic import Field
 
-from plugins.interfaces.camera import AWACamera
 from plugins.interfaces.epics_interface import EPICSInterface
 
 
 class TestAWAInterface(EPICSInterface):
     name = "awa_interface"
-    camera_app: AWACamera = Field(
-        AWACamera(None), description="awa frame grabber object"
-    )
     x: float = None
+    y: float = None
 
     class Config:
         arbitrary_types_allowed = True
@@ -19,7 +16,8 @@ class TestAWAInterface(EPICSInterface):
     def set_channels(self, channel_inputs: Dict[str, float]):
         for name, val in channel_inputs.items():
             if name == "Q6:BCTRL":
-                self.x = val**2
+                self.x = abs(val)
+                self.y = -abs(val) + 0.5 
 
     def get_channels(self, channels: List[str]) -> Dict[str, float]:
         data = {}
@@ -28,5 +26,7 @@ class TestAWAInterface(EPICSInterface):
                 data[name] = 1.0
             elif name == "YAG1:XRMS":
                 data[name] = self.x
+            elif name == "YAG1:YRMS":
+                data[name] = self.y
 
         return data
