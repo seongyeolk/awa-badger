@@ -1,9 +1,9 @@
+import select
 import socket
 import time
 from typing import List
 
 import numpy as np
-import select
 from epics import caget, caget_many
 from win32com import client
 
@@ -17,9 +17,11 @@ class AWACamera:
     awa_pg_port = 2019
     awa_nifg_port = 2029
 
-    def __init__(self, camera_type, testing=False):
+    channel_names = ["FG_FWHMX", "FG_FWHMY", "FG_FWHML", "FG_CX", "FG_CY", "FG_IMG"]
+
+    def __init__(self, camera_type):
         self.initialized = False
-        self.testing = testing
+        self.testing = True if camera_type is None else False
 
         # initialize connections
         if not self.testing:
@@ -84,7 +86,7 @@ class AWACamera:
         roi = None
         image_data = []
         img = None
-        image_data_keys = ["FWHMX", "FWHMY", "FWHML", "CX", "CY"]
+        image_data_keys = self.observable_names[:-1]
 
         epics_pvs = epics_pvs or {}
         epics_measurements = {}
@@ -125,7 +127,7 @@ class AWACamera:
             # get ROI
             roi = np.array(((0, 0), (10, 10)))
 
-        output = {"raw_image": img, "ROI": roi}
+        output = {self.observable_names[-1]: img, "ROI": roi}
         for i, name in enumerate(image_data_keys):
             output[name] = image_data[i]
 

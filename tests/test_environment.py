@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict, List
 
 import pytest
 
@@ -7,13 +7,10 @@ from plugins.interfaces.interface import Interface
 
 
 class DummyInterface(Interface):
-    def get_variables(self, variable_names: List[str]) -> Dict:
+    def set_channels(self, channel_inputs: Dict[str, float]):
         pass
 
-    def set_variables(self, variable_inputs: Dict[str, float]):
-        pass
-
-    def get_observables(self, observable_names: List[str]) -> Dict:
+    def get_channels(self, channels: List[str]) -> Dict[str, float]:
         pass
 
 
@@ -23,9 +20,14 @@ class TestEnvironment:
         observables = ["z"]
         params = {"a": 1, "b": 2}
 
-        interface = DummyInterface(name="test_interface", variables=variables,
-                                   observables=observables)
-        env = Environment(name="test_env", interface=interface, params=params)
+        interface = DummyInterface(name="test_interface")
+        env = Environment(
+            name="test_env",
+            variables=variables,
+            observables=observables,
+            interface=interface,
+            params=params,
+        )
 
         assert env.name == "test_env"
         assert env.interface == interface
@@ -36,10 +38,15 @@ class TestEnvironment:
     def test_environment_creation_without_params(self):
         variables = {"x": [0, 1], "y": [0, 2]}
         observables = ["z"]
+        params = {"a": 1, "b": 2}
 
-        interface = DummyInterface(name="test_interface", variables=variables,
-                                   observables=observables)
-        env = Environment(name="test_env", interface=interface)
+        interface = DummyInterface(name="test_interface")
+        env = Environment(
+            name="test_env",
+            variables=variables,
+            observables=observables,
+            interface=interface,
+        )
 
         assert env.name == "test_env"
         assert env.interface == interface
@@ -50,18 +57,28 @@ class TestEnvironment:
         variables = {"x": [1, 0], "y": [0, 2]}
         observables = ["z"]
 
+        interface = DummyInterface(name="test_interface")
         with pytest.raises(ValueError):
-            DummyInterface(name="test_interface", variables=variables,
-                           observables=observables)
+            Environment(
+                name="test_env",
+                variables=variables,
+                observables=observables,
+                interface=interface,
+            )
 
     def test_get_variables(self):
         variables = {"x": [0, 1], "y": [0, 2]}
         observables = ["z"]
         params = {"a": 1, "b": 2}
 
-        interface = DummyInterface(name="test_interface", variables=variables,
-                                   observables=observables)
-        env = Environment(name="test_env", interface=interface, params=params)
+        interface = DummyInterface(name="test_interface")
+        env = Environment(
+            name="test_env",
+            variables=variables,
+            observables=observables,
+            interface=interface,
+            params=params,
+        )
 
         # Test getting multiple variables
         env.get_variables(["x", "y"])
