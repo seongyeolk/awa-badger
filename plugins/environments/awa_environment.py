@@ -1,22 +1,25 @@
 from typing import Dict, List, Optional, Union
 
-from plugins.environments.environment import Environment
+from plugins.environments.environment import Environment, validate_observable_names
 from plugins.interfaces.awa_interface import AWAInterface
 
 from plugins.interfaces.camera import AWACamera
 
 from pydantic import conlist, Field, PositiveFloat
 
+from plugins.interfaces.interface import Interface
+
 
 class AWAEnvironment(Environment):
     name = "awa_environment"
-    interface = AWAInterface(camera_app=AWACamera(None))
+    interface: Interface = AWAInterface(camera_app=AWACamera(None))
 
     variables: Dict[str, conlist(float, min_items=2, max_items=2)] = {
         "x": [0, 1],
         "y": [0, 2],
     }
-    observables = ["AWAICTMon:Ch1", "AWAICTMon:Ch2", "AWAICTMon:Ch3", "AWAICTMon:Ch4"]
+    observables = ["AWAICTMon:Ch1", "AWAICTMon:Ch2", "AWAICTMon:Ch3",
+                   "AWAICTMon:Ch4", "YAG1:XRMS"]
 
     target_charge_PV: str = "AWAICTMon:Ch1"
     target_charge: Optional[PositiveFloat] = Field(
@@ -26,6 +29,7 @@ class AWAEnvironment(Environment):
         0.1, description="fractional deviation from target charge allowed"
     )
 
+    @validate_observable_names
     def get_observables(self, observable_names: List[str]) -> Dict:
         """make measurements until charge range is within bounds"""
 
