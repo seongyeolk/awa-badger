@@ -4,7 +4,7 @@ import time
 from typing import List
 
 import numpy as np
-from epics import caget, caget_many
+from epics import caget_many
 from win32com import client
 
 

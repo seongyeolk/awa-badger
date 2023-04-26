@@ -1,24 +1,19 @@
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
+
+import pandas as pd
+from pydantic import Field, PositiveFloat
 
 from plugins.environments.environment import Environment, validate_observable_names
-#from plugins.interfaces.awa_interface import AWAInterface
-#from plugins.interfaces.camera import AWACamera
-
-from pydantic import conlist, Field, PositiveFloat
-
 from plugins.interfaces.interface import Interface
+
+
+# from plugins.interfaces.awa_interface import AWAInterface
+# from plugins.interfaces.camera import AWACamera
 
 
 class AWAEnvironment(Environment):
     name = "awa_environment"
     interface: Interface# = AWAInterface(camera_app=AWACamera(None))
-
-    variables: Dict[str, conlist(float, min_items=2, max_items=2)] = {
-        "x": [0, 1],
-        "y": [0, 2],
-    }
-    observables = ["AWAICTMon:Ch1", "AWAICTMon:Ch2", "AWAICTMon:Ch3",
-                   "AWAICTMon:Ch4", "YAG1:XRMS", "YAG1:YRMS"]
 
     target_charge_PV: str = "AWAICTMon:Ch1"
     target_charge: Optional[PositiveFloat] = Field(
@@ -27,6 +22,29 @@ class AWAEnvironment(Environment):
     fractional_charge_deviation: PositiveFloat = Field(
         0.1, description="fractional deviation from target charge allowed"
     )
+
+    def __init__(self, varaible_file: str, observable_file: str, interface: Interface,
+                 **kwargs):
+
+        # process variable and observable files to det variables and observables
+        variable_info = pd.read_csv(varaible_file).set_index(
+            "NAME")
+        observable_info = pd.read_csv(
+            observable_file
+        ).set_index("NAME").T
+
+        _variables = variable_info[["MIN", "MAX"]].T.to_dict()
+        _observables = list(observable_info.keys())
+
+        for name in _variables:
+            _variables[name] = [_variables[name]["MIN"], _variables[name]["MAX"]]
+
+        super(AWAEnvironment, self).__init__(
+            variables=_variables,
+            observables=_observables,
+            interface=interface,
+            **kwargs
+        )
 
     @validate_observable_names
     def get_observables(self, observable_names: List[str]) -> Dict:
