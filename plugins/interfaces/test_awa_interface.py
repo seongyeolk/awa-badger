@@ -1,7 +1,5 @@
 from typing import Dict, List
 
-from pydantic import Field
-
 from plugins.interfaces.epics_interface import EPICSInterface
 
 
@@ -15,7 +13,7 @@ class TestAWAInterface(EPICSInterface):
 
     def set_channels(self, channel_inputs: Dict[str, float]):
         for name, val in channel_inputs.items():
-            if name == "Q6:BCTRL":
+            if name == "AWA:Bira3Ctrl:Ch00":
                 self.x = abs(val)
                 self.y = -abs(val) + 0.5 
 

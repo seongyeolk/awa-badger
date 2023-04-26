@@ -1,0 +1,7 @@
+﻿NAME,SCALE,UNIT,DESCRIPTION
+YAG1:XRMS,1,m,xrms beamsize on screen DYG1
+YAG1:YRMS,1,m,yrms beamsize on screen DYG1
+AWAICTMon:Ch1,1,nC,ICT1 charge
+AWAICTMon:Ch2,1,nC,ICT2 charge
+AWAICTMon:Ch3,1,nC,ICT3 charge
+AWAICTMon:Ch4,1,nC,ICT4 charge
