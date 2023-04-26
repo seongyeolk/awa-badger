@@ -15,16 +15,16 @@ class TestAWAInterface(EPICSInterface):
         for name, val in channel_inputs.items():
             if name == "AWA:Bira3Ctrl:Ch00":
                 self.x = abs(val)
-                self.y = -abs(val) + 0.5 
+                self.y = -abs(val) + 0.5
 
     def get_channels(self, channels: List[str]) -> Dict[str, float]:
         data = {}
         for name in channels:
             if name == "AWAICTMon:Ch1":
                 data[name] = 1.0
-            elif name == "YAG1:XRMS":
+            elif name == "TEST:XRMS":
                 data[name] = self.x
-            elif name == "YAG1:YRMS":
+            elif name == "TEST:YRMS":
                 data[name] = self.y
 
         return data
