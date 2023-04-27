@@ -5,7 +5,7 @@ AWAICTMon:Ch1,1,nC,ICT1 charge
 AWAICTMon:Ch2,1,nC,ICT2 charge
 AWAICTMon:Ch3,1,nC,ICT3 charge
 AWAICTMon:Ch4,1,nC,ICT4 charge
-13ARV1:Stats1:CentroidX_RBV,1,px,x centroid
-13ARV1:Stats1:CentroidY_RBV,1,px,y centroid
+13ARV1:Stats1:CentroidX_RBV,1,px,x centroid from EPICS server
+13ARV1:Stats1:CentroidY_RBV,1,px,y centroid from EPICS server
 13ARV1:Stats1:SigmaX_RBV,1,px,x rms
 13ARV1:Stats1:SigmaY_RBV,1,px,y rms

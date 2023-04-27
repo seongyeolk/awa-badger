@@ -24,22 +24,6 @@ class AWAEnvironment(Environment):
         0.1, description="fractional deviation from target charge allowed"
     )
 
-    roi_pvs: List[str] = [
-        "13ARV1:ROI1:MinX_RBV",
-        "13ARV1:ROI1:MinY_RBV",
-        "13ARV1:ROI1:SizeX_RBV",
-        "13ARV1:ROI1:SizeY_RBV",
-    ]
-
-    centroid_pvs: List[str] = [
-        "13ARV1:Stats1:CentroidX_RBV",
-        "13ARV1:Stats1:CentroidY_RBV",
-        "13ARV1:Stats1:SigmaX_RBV",
-        "13ARV1:Stats1:SigmaY_RBV",
-    ]
-
-    virtual_observables: List[str] = ["MAX_EXCURSION"]
-
     def __init__(
         self, varaible_file: str, observable_file: str, interface: Interface, **kwargs
     ):
@@ -60,41 +44,26 @@ class AWAEnvironment(Environment):
             **kwargs,
         )
 
-        self.observables = sorted(
-            list(
-                set(
-                    self.roi_pvs
-                    + self.centroid_pvs
-                    + self.virtual_observables
-                    + self.observables
-                )
-            )
-        )
-
     @validate_observable_names
     def get_observables(self, observable_names: List[str]) -> Dict:
         """make measurements until charge range is within bounds"""
 
         while True:
-            # add PV's to measure the maximum excursion of the beam outside the ROI
-            if "MAX_EXCURSION" in observable_names:
-                observable_names += self.roi_pvs
-                observable_names += self.centroid_pvs
-
             if self.target_charge is not None:
                 observable_names += [self.target_charge_PV]
 
             # remove duplicates
             observable_names = list(set(observable_names))
 
-            # do measurements
-            measurement = self.interface.get_channels(observable_names)
+            # if a screen measurement is involved
+            base_observable_names = [ele.split(":")[0] for ele in observable_names]
+            screen_name = "13ARV1"
 
-            # calculate the maximum excursion
-            if "MAX_EXCURSION" in observable_names:
-                measurement["MAX_EXCURSION"] = calculate_maximum_excursion(
-                    *[measurement[name] for name in self.roi_pvs + self.centroid_pvs]
-                )
+            if screen_name in base_observable_names:
+                measurement = self.get_screen_measurement(screen_name, observable_names)
+            else:
+                # otherwise do normal epics communication
+                measurement = self.interface.get_channels(observable_names)
 
             if self.target_charge is not None:
                 charge_value = measurement[self.target_charge_PV]
@@ -104,6 +73,50 @@ class AWAEnvironment(Environment):
                     print(f"charge value {charge_value} is outside bounds")
             else:
                 break
+
+        return measurement
+
+    def get_screen_measurement(self, screen_name, extra_pvs=None):
+        roi_readbacks = [
+            "ROI1:MinX_RBV",
+            "ROI1:MinY_RBV",
+            "ROI1:SizeX_RBV",
+            "ROI1:SizeY_RBV",
+        ]
+        centroid_readbacks = [
+            "Stats1:CentroidX_RBV",
+            "Stats1:CentroidY_RBV",
+            "Stats1:SigmaX_RBV",
+            "Stats1:SigmaY_RBV",
+        ]
+
+        extra_pvs = extra_pvs or []
+
+        # construct list of all PVs necessary for measurement
+        observation_pvs = [
+            f"{screen_name}:{pv_name}" for pv_name in roi_readbacks + centroid_readbacks
+        ] + extra_pvs
+
+        # get rid of duplicate PVs
+        observation_pvs = list(set(observation_pvs))
+
+        # do measurement and sort data
+        measurement = self.interface.get_channels(observation_pvs)
+        roi_data = np.array([measurement[ele] for ele in observation_pvs[:4]])
+        beam_data = np.array([measurement[ele] for ele in observation_pvs[4:]])
+
+        # validate measurement
+        ll_penalty, ur_penalty = validate_screen_measurement(
+            roi_data[:2], roi_data[2:], beam_data[:2], beam_data[2:]
+        )
+
+        # remove data that is invalid
+        if ll_penalty > 0 or ur_penalty > 0:
+            for name in observation_pvs[4:]:
+                measurement[name] = np.nan
+
+        measurement["LL_BOX_PENALTY"] = ll_penalty
+        measurement["UR_BOX_PENALTY"] = ur_penalty
 
         return measurement
 
@@ -119,23 +132,43 @@ class AWAEnvironment(Environment):
             return True
 
 
-def calculate_maximum_excursion(
-    min_x, min_y, size_x, size_y, c_x, c_y, s_x, s_y, sigma_scale_factor=3
+def validate_screen_measurement(
+    roi_min_pt, roi_sizes, beam_centroid, beam_rms, sigma_scale_factor=3
 ):
-    # calculate the center of the ROI
-    roi_c = np.array([min_x + size_x / 2.0, min_y + size_y / 2.0])
-    beam_env_min = np.array(
-        [c_x - sigma_scale_factor * s_x, c_y - sigma_scale_factor * s_y]
-    )
-    beam_env_max = np.array(
-        [c_x + sigma_scale_factor * s_x, c_y + sigma_scale_factor * s_y]
-    )
+    # inscribe a circle inside the roi_rectangle
+    roi_c = roi_min_pt + roi_sizes / 2.0
+    roi_radius = np.min(roi_sizes) / 2.0
 
-    roi_sizes = np.array([size_x, size_y])
+    # calculate the beam rectangle
+    beam_ll = beam_centroid - beam_rms * sigma_scale_factor
+    beam_ur = beam_centroid + beam_rms * sigma_scale_factor
 
-    return np.max(
-        (
-            np.abs(beam_env_max - roi_c) - roi_sizes / 2,
-            np.abs(roi_c - beam_env_min) - roi_sizes / 2,
-        )
-    )
+    # calculate the distance from the center of the roi circle to each corner of the
+    # beam rectangle
+    ll_distance = np.linalg.norm((beam_ll - roi_c))
+    ur_distance = np.linalg.norm((beam_ur - roi_c))
+
+    ll_penalty = ll_distance - roi_radius  # if > 0 then the measurement is invalid
+    ur_penalty = ur_distance - roi_radius  # if > 0 then the measurement is invalid
+
+    return ll_penalty, ur_penalty
+
+
+def rectangle_union_area(llc1, s1, llc2, s2):
+    # Compute the intersection of the two rectangles
+    x1, y1 = llc1
+    x2, y2 = llc2
+    w1, h1 = s1
+    w2, h2 = s2
+    x_overlap = max(0, min(x1 + w1, x2 + w2) - max(x1, x2))
+    y_overlap = max(0, min(y1 + h1, y2 + h2) - max(y1, y2))
+    overlap_area = x_overlap * y_overlap
+
+    # Compute the areas of the two rectangles
+    rect1_area = w1 * h1
+    rect2_area = w2 * h2
+
+    # Compute the area of the union
+    union_area = rect1_area + rect2_area - overlap_area
+
+    return union_area
