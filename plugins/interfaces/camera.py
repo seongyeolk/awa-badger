@@ -5,7 +5,6 @@ from typing import List
 
 import numpy as np
 from epics import caget_many
-from win32com import client
 
 
 class ROIError(Exception):
@@ -25,6 +24,9 @@ class AWACamera:
 
         # initialize connections
         if not self.testing:
+            # lazy import if not testing
+            from win32com import client
+            
             # no idea what this is -- used for gating measurement
             self.usb_dio_client = client.Dispatch("USBDIOCtrl.Application")
 

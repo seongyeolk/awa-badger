@@ -58,6 +58,7 @@ class StandardModelConstructor(ModelConstructor):
         return self.build_standard_model()
 
     def build_standard_model(self, **model_kwargs):
+        pd.options.mode.use_inf_as_na = True
         models = []
         for name in self.vocs.output_names:
             outcome_transform = Standardize(1)
@@ -66,24 +67,32 @@ class StandardModelConstructor(ModelConstructor):
 
             # objective specifics
             if name in self.vocs.objective_names:
+                #print(self.objective_data)
+                #print(self.objective_data.isna())
+
                 # get training data
                 train_X = torch.tensor(
-                    self.input_data[~self.objective_data.isnull()].to_numpy(),
+                    self.input_data[~self.objective_data[name].isnull()].to_numpy(),
                     **self.tkwargs)
 
                 train_Y = torch.tensor(
-                    self.objective_data[name].to_numpy(), **self.tkwargs
+                    self.objective_data[~self.objective_data[name].isnull()][name].to_numpy(), **self.tkwargs
                 ).unsqueeze(-1)
+                
+                #print(train_X, train_Y)
+
 
             # constraint specific
             elif name in self.vocs.constraint_names:
                 train_X = torch.tensor(
-                    self.input_data[~self.objective_data.isnull()].to_numpy(),
+                    self.input_data[~self.constraint_data[name].isnull()].to_numpy(),
                     **self.tkwargs)
 
                 train_Y = torch.tensor(
-                    self.constraint_data[name].to_numpy(), **self.tkwargs
+                    self.constraint_data[~self.constraint_data[name].isnull()][name].to_numpy(), **self.tkwargs
                 ).unsqueeze(-1)
+                
+                #print(train_X, train_Y)
 
             else:
                 raise RuntimeError(

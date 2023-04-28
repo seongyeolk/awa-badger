@@ -2,12 +2,14 @@ from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
+from scipy.ndimage import gaussian_filter
 
 from plugins.environments.environment import Environment, validate_observable_names
 from plugins.interfaces.interface import Interface
 from pydantic import Field, PositiveFloat
 
-
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 # from plugins.interfaces.awa_interface import AWAInterface
 # from plugins.interfaces.camera import AWACamera
 
@@ -16,7 +18,7 @@ class AWAEnvironment(Environment):
     name = "awa_environment"
     interface: Interface  # = AWAInterface(camera_app=AWACamera(None))
 
-    target_charge_PV: str = "AWAICTMon:Ch1"
+    target_charge_PV: str = "AWAVXI11ICT:Ch1"
     target_charge: Optional[PositiveFloat] = Field(
         None, description="magnitude of target charge in nC"
     )
@@ -60,13 +62,15 @@ class AWAEnvironment(Environment):
             screen_name = "13ARV1"
 
             if screen_name in base_observable_names:
-                measurement = self.get_screen_measurement(screen_name, observable_names)
+                measurement = self.get_screen_measurement(
+                    screen_name, observable_names
+                )
             else:
                 # otherwise do normal epics communication
                 measurement = self.interface.get_channels(observable_names)
 
             if self.target_charge is not None:
-                charge_value = measurement[self.target_charge_PV]
+                charge_value = measurement[self.target_charge_PV]*1e9
                 if self.is_inside_charge_bounds(charge_value):
                     break
                 else:
@@ -77,48 +81,54 @@ class AWAEnvironment(Environment):
         return measurement
 
     def get_screen_measurement(self, screen_name, extra_pvs=None):
-        roi_readbacks = [
-            "ROI1:MinX_RBV",
-            "ROI1:MinY_RBV",
-            "ROI1:SizeX_RBV",
-            "ROI1:SizeY_RBV",
-        ]
-        centroid_readbacks = [
-            "Stats1:CentroidX_RBV",
-            "Stats1:CentroidY_RBV",
-            "Stats1:SigmaX_RBV",
-            "Stats1:SigmaY_RBV",
-        ]
+        #roi_readbacks = [
+        #    "ROI1:MinX_RBV",
+        #    "ROI1:MinY_RBV",
+        #    "ROI1:SizeX_RBV",
+        #    "ROI1:SizeY_RBV",
+        #]
+        
+        
+        #centroid_readbacks = [
+        #    "Stats1:CentroidX_RBV",
+        #    "Stats1:CentroidY_RBV",
+        #    "Stats1:SigmaX_RBV",
+        #    "Stats1:SigmaY_RBV",
+        #]
 
         extra_pvs = extra_pvs or []
 
         # construct list of all PVs necessary for measurement
-        observation_pvs = [
-            f"{screen_name}:{pv_name}" for pv_name in roi_readbacks + centroid_readbacks
-        ] + extra_pvs
+        #observation_pvs = [
+        #    f"{screen_name}:{pv_name}" for pv_name in roi_readbacks + centroid_readbacks
+        #] + extra_pvs
 
         # get rid of duplicate PVs
-        observation_pvs = list(set(observation_pvs))
+        #observation_pvs = list(set(observation_pvs))
 
         # do measurement and sort data
+        observation_pvs = [
+            "13ARV1:image1:ArrayData",
+            "13ARV1:image1:ArraySize0_RBV",
+            "13ARV1:image1:ArraySize1_RBV"
+        ] + extra_pvs
+        
+        observation_pvs = list(set(observation_pvs))
         measurement = self.interface.get_channels(observation_pvs)
-        roi_data = np.array([measurement[ele] for ele in observation_pvs[:4]])
-        beam_data = np.array([measurement[ele] for ele in observation_pvs[4:]])
-
-        # validate measurement
-        ll_penalty, ur_penalty = validate_screen_measurement(
-            roi_data[:2], roi_data[2:], beam_data[:2], beam_data[2:]
+        
+        img = measurement.pop("13ARV1:image1:ArrayData")
+        img = img.reshape(
+            measurement["13ARV1:image1:ArraySize1_RBV"],
+            measurement["13ARV1:image1:ArraySize0_RBV"]
         )
+        roi_data = np.array((100,200,1000,1000))
+        threshold = 200
 
-        # remove data that is invalid
-        if ll_penalty > 0 or ur_penalty > 0:
-            for name in observation_pvs[4:]:
-                measurement[name] = np.nan
-
-        measurement["LL_BOX_PENALTY"] = ll_penalty
-        measurement["UR_BOX_PENALTY"] = ur_penalty
-
-        return measurement
+        beam_data = get_beam_data(img, roi_data, threshold, visualize=False)
+        measurement.update(
+            {f"{screen_name}:{name}":beam_data[name] for name in beam_data}
+        )
+        return measurement 
 
     def is_inside_charge_bounds(self, value):
         """test to make sure that charge value is within bounds"""
@@ -131,28 +141,100 @@ class AWAEnvironment(Environment):
         else:
             return True
 
+def get_beam_data(img, roi_data, threshold,visualize=True):
+    cropped_image = img[roi_data[0]:roi_data[0] + roi_data[2], 
+                        roi_data[1]:roi_data[1] + roi_data[3]]
+    
+    filtered_image = gaussian_filter(cropped_image, 3.0)
+    
+    thresholded_image = np.where(
+        filtered_image - threshold > 0, filtered_image - threshold, 0
+    )
+    
+   
+    total_intensity = np.sum(thresholded_image)
+    
+    cx,cy,sx,sy = calculate_stats(thresholded_image)
+    c = np.array((cx,cy))
+    s = np.array((sx, sy))
+        
+    # get beam region
+    n_stds = 2
+    pts = np.array(
+        (
+            c - n_stds*s, 
+            c + n_stds*s, 
+            c - n_stds*s*np.array((-1,1)), 
+            c + n_stds*s*np.array((-1,1))
+        )
+    )
+    
+    # get distance from beam region to ROI center
+    roi_c = np.array((roi_data[2], roi_data[3])) / 2
+    roi_radius = np.min((roi_c*2, np.array(thresholded_image.shape))) / 2
 
-def validate_screen_measurement(
-    roi_min_pt, roi_sizes, beam_centroid, beam_rms, sigma_scale_factor=3
-):
-    # inscribe a circle inside the roi_rectangle
-    roi_c = roi_min_pt + roi_sizes / 2.0
-    roi_radius = np.min(roi_sizes) / 2.0
+    
+    # validation
+    if visualize:
+        fig,ax = plt.subplots()
+        c = ax.imshow(thresholded_image,origin="lower")
+        ax.plot(cx,cy,"+r")
+        fig.colorbar(c)
 
-    # calculate the beam rectangle
-    beam_ll = beam_centroid - beam_rms * sigma_scale_factor
-    beam_ur = beam_centroid + beam_rms * sigma_scale_factor
-
-    # calculate the distance from the center of the roi circle to each corner of the
-    # beam rectangle
-    ll_distance = np.linalg.norm((beam_ll - roi_c))
-    ur_distance = np.linalg.norm((beam_ur - roi_c))
-
-    ll_penalty = ll_distance - roi_radius  # if > 0 then the measurement is invalid
-    ur_penalty = ur_distance - roi_radius  # if > 0 then the measurement is invalid
-
-    return ll_penalty, ur_penalty
-
+        rect = patches.Rectangle(pts[0], *s*n_stds*2.0, facecolor='none', edgecolor="r")
+        ax.add_patch(rect)
+        
+        circle = patches.Circle(roi_c, roi_radius, facecolor="none", edgecolor="r")
+        ax.add_patch(circle)
+        #ax2 = ax.twinx()
+        #ax2.plot(thresholded_image.sum(axis=0))
+        ax.set_ylim(0,1000)
+        
+    distances = np.linalg.norm(pts - roi_c, axis=1)
+    
+    # subtract radius to get penalty value
+    penalty = np.max(distances) - roi_radius
+    
+    # penalize no beam
+    if total_intensity < 10000:
+        penalty = 1000
+    
+    
+    results = {
+        "Cx" : cx, 
+        "Cy": cy, 
+        "Sx": sx, 
+        "Sy": sy, 
+        "penalty": penalty, 
+    }
+    
+    if penalty > 0:
+        for name in ["Cx","Cy","Sx","Sy"]:
+            results[name] = None
+            
+    return results
+        
+     
+def calculate_stats(img):
+    rows, cols = img.shape
+    row_coords = np.arange(rows)
+    col_coords = np.arange(cols)
+    
+    m00 = np.sum(img)
+    m10 = np.sum(col_coords[:, np.newaxis] * img.T)
+    m01 = np.sum(row_coords[:, np.newaxis] * img)
+    
+    Cx = m10/m00
+    Cy = m01/m00
+    
+    m20 = np.sum((col_coords[:, np.newaxis] - Cx)**2 * img.T)
+    m02 = np.sum((row_coords[:, np.newaxis] - Cy)**2 * img)
+    
+    sx = (m20 / m00)**0.5
+    sy = (m02 / m00)**0.5
+    
+    return Cx, Cy, sx, sy
+    
 
 def rectangle_union_area(llc1, s1, llc2, s2):
     # Compute the intersection of the two rectangles
