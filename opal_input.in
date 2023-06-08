@@ -256,11 +256,11 @@ AWA_Drivelinac:Line = (Injector, Linac);
 //============================================================================
 // INITIAL DISTRIBUTION
 DistFT: DISTRIBUTION, TYPE = FLATTOP,
-SIGMAX = 2.71E-3, // this is actually 2sigma -- radius for unif. distrib.
-SIGMAY = 2.71E-3, // this is actually 2sigma -- radius for unif. distrib.
+SIGMAX = 2.75E-3, // this is actually 2sigma -- radius for unif. distrib. // Originally it was 2.71, but it can be 2.75 mm for actual 5.5 mm.
+SIGMAY = 2.75E-3, // this is actually 2sigma -- radius for unif. distrib.
 TRISE = 0.3e-12/2.35482*1.6869,
 TFALL = 0.3e-12/2.35482*1.6869, // see Tab14.11
-TPULSEFWHM = 6.0e-12,
+TPULSEFWHM = 0.3e-12, // 6.0E-12 is the one with 5 BBO crystals.
 CUTOFFLONG = 4.0,
 NBIN = BINS,
 EMISSIONSTEPS = 500, // For convergence
