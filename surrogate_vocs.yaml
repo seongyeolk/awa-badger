@@ -26,3 +26,5 @@ linked_variables: {}
 #   DQ7: 0.000000001 T/m
 
 # Bunch charge: 1 nC
+
+# Laser spot on cathode: 5.5 mm diameter, uniform distribution
