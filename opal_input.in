@@ -1,0 +1,312 @@
+//============================================================================
+//============================================================================
+OPTION, PSDUMPFREQ = 50000; // 6d data written every 50000th time step (h5).
+OPTION, STATDUMPFREQ = 10; // Beam Stats written every time step (stat).
+OPTION, BOUNDPDESTROYFQ = 10; // Delete lost particles, if any out of 10 \sigma
+OPTION, AUTOPHASE = 4; // Autophase is on, and phase of max energy gain will be found automatically for cavities.
+OPTION, VERSION=10900;
+Title, string="AWA Photoinjector -- Drive Beamline";
+Value,{OPALVERSION};
+//============================================================================
+//============================================================================
+//Global Parameters
+REAL rf_freq = 1.3e9; // RF frequency. (Hz)
+REAL beam_bunch_charge = 1.0e-9; // Charge of bunch. (C)
+//============================================================================
+//============================================================================
+//Fieldsolver configuration
+REAL MX = 32;
+REAL MY = 32;
+REAL MZ = 32;
+REAL BINS = 5;
+REAL NPPG = 8;
+REAL n_particles=MX*MY*MZ*NPPG; // For convergence. 
+//============================================================================
+//============================================================================
+// Gun timestep
+REAL dTq = 1.0E-13; // Timestep for quadrupole magnet
+REAL dTg = 1.0E-12;
+REAL dTd = 1.0E-11;
+//============================================================================
+//============================================================================
+//Initial Momentum Calculation
+REAL Edes = 0.55e-9; //initial energy in GeV
+REAL gamma = (Edes+EMASS)/EMASS;
+REAL beta = sqrt(1-(1/gamma^2));
+REAL P0 = gamma*beta*EMASS; //inital z momentum
+//============================================================================
+//============================================================================
+//Printing initial energy and momentum to terminal output.
+value , {Edes, P0};
+//============================================================================
+//============================================================================
+// RF Photoinjector
+//============================================================================
+//============================================================================
+REAL Gun_field_maps = 2; // 2D vs 3D maps
+// RF gun phase
+REAL gun_phase = -0.7588; // 50 degree operation
+//REAL klystron_1 = 1.00;
+REAL gun_inj_amp = 61.26;
+REAL gun_inj_phase = gun_phase; // Rf injection phase (in degrees) with restpect
+// to max phase. i.e. 0.0 inj phase corresponds
+// to running on crest (max energy).
+//============================================================================
+//============================================================================
+photocathode: SOURCE, ORIGIN = {0,0,0};
+if (Gun_field_maps == 2.0){
+REAL gun_freq = 1300.013338990260;
+REAL gun_len = 0.292707450;
+GUN: RFCavity, L = gun_len,
+VOLT = gun_inj_amp,
+ORIGIN = {0,0,0},
+TYPE = "STANDING",
+FMAPFN = "../AWA_Fieldmap/GUN.T7",
+FREQ = gun_freq,
+LAG = (gun_inj_phase*Pi)/180.0;
+}
+else {
+REAL gun_freq = 1300.0;
+REAL gun_len = 2.327100e-01;
+GUN: RFCavity, L = gun_len,
+VOLT = gun_inj_amp,
+ORIGIN = {0,0,0},
+TYPE = "STANDING",
+FMAPFN = "./gun3d.T7",
+FREQ = gun_freq,
+LAG = (gun_inj_phase*Pi)/180.0;
+}
+//============================================================================
+//============================================================================
+// Bucking solenoid DS1 (same as focusing)
+// REAL Ibuck = 0; // [A] ;; 100 A gives Bcath=2.526366e-02
+// line below if for bucking the field on cathode
+REAL Ibuck = 550;
+REAL KSB = (Ibuck/550.)*0.12017;
+solBF: Solenoid, L = 0.5, ELEMEDGE=0.0, KS = KSB,
+FMAPFN = "../AWA_Fieldmap/1T7.T7";
+//============================================================================
+//============================================================================
+// Matching Solenoid DS3
+// note polarity is same as solF (i.e. flipped from solB)
+//============================================================================
+REAL Imain = 230;
+//[A] ;; 100 A gives Bcath=-6.481346e-05
+REAL KSM = (Imain/440.)*0.61126;
+solM: Solenoid, L = 0.486, ELEMEDGE=0.0, KS = KSM,
+FMAPFN = "../AWA_Fieldmap/M440.T7";
+//============================================================================
+//============================================================================
+// Linac
+//============================================================================
+//============================================================================
+REAL Linac_field_maps = 2; // 3 - 3D or 2 -- 2D (3D for coupler kick)
+REAL Linac_amp = 22.06;
+//============================================================================
+//============================================================================
+// knobs to gang cavity according to klystron
+REAL Klystron_2 = 1.;
+REAL Klystron_3 = 1.;
+REAL Klystron_4 = 1.; // 0 when running EEX beamline
+//============================================================================
+//============================================================================
+// phase and amplitude
+REAL Linacphase = 0.0;
+REAL L1_Amp = Linac_amp*Klystron_2;
+REAL L1_Phase = Linacphase;
+REAL L2_Amp = Linac_amp*Klystron_2;
+REAL L2_Phase = Linacphase;
+REAL L3_Amp = Linac_amp*Klystron_3;
+REAL L3_Phase = Linacphase;
+REAL L4_Amp = Linac_amp*Klystron_3;
+REAL L4_Phase = Linacphase;
+REAL L5_Amp = Linac_amp*Klystron_3;
+REAL L5_Phase = Linacphase;
+REAL L6_Amp = Linac_amp*Klystron_3;
+REAL L6_Phase = Linacphase;
+//============================================================================
+//============================================================================
+//============================================================================
+//============================================================================
+// linac tanks positions
+REAL zc_linac1 = 1.1810; // center linac 1
+REAL zc_linac2 = 3.9735; // center linac 2
+REAL zc_linac3 = 5.5415; // center linac 3
+REAL zc_linac4 = 7.6709; // center linac 4
+REAL zc_linac5 = 9.0107; // center linac 5
+REAL zc_linac6 = 10.4258; // center linac 6
+//============================================================================
+//============================================================================
+if (Linac_field_maps == 2.0){
+REAL linac_len = 1.20713354;
+REAL linac_freq = 1300.000246546;
+L1: RFCavity, L = linac_len, FREQ = linac_freq, TYPE = "STANDING",
+FMAPFN = "../AWA_Fieldmap/DriveLinac.T7",
+VOLT = L1_Amp, LAG = (L1_Phase* Pi) / 180.0,
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_linac1-linac_len/2.};
+L2: RFCavity, L = linac_len, FREQ = linac_freq, TYPE = "STANDING",
+FMAPFN = "../AWA_Fieldmap/DriveLinac.T7",
+VOLT = L2_Amp, LAG = (L2_Phase* Pi) / 180.0,
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_linac2-linac_len/2.};
+L3: RFCavity, L = linac_len, FREQ = linac_freq, TYPE = "STANDING",
+FMAPFN = "../AWA_Fieldmap/DriveLinac.T7",
+VOLT = L3_Amp, LAG = (L3_Phase* Pi) / 180.0,
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_linac3-linac_len/2.};
+L4: RFCavity, L = linac_len, FREQ = linac_freq, TYPE = "STANDING",
+FMAPFN = "../AWA_Fieldmap/DriveLinac.T7",
+VOLT = L4_Amp, LAG = (L4_Phase* Pi) / 180.0,
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_linac4-linac_len/2.};
+L5: RFCavity, L = linac_len, FREQ = linac_freq, TYPE = "STANDING",
+FMAPFN = "../AWA_Fieldmap/DriveLinac.T7",
+VOLT = L5_Amp, LAG = (L5_Phase* Pi) / 180.0,
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_linac5-linac_len/2.};
+L6: RFCavity, L = linac_len, FREQ = linac_freq, TYPE = "STANDING",
+FMAPFN = "../AWA_Fieldmap/DriveLinac.T7",
+VOLT = L6_Amp, LAG = (L6_Phase* Pi) / 180.0,
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_linac6-linac_len/2.};
+}
+//============================================================================
+//============================================================================
+else {
+REAL linac_len = 1.2;
+REAL linac_freq = 1300.0;
+L1: RFCavity, L = linac_len, FREQ = linac_freq, TYPE = "STANDING",
+FMAPFN = Linac3dFILE, // From Jihang
+FMAPFN = "linac3d_cplrRight.T7", // from Jihang
+// FMAPFN = "DriveLinac_3D.txt", // from Andreas
+VOLT = L1_Amp, LAG = (L1_Phase* Pi) / 180.0,
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {-4e-3,0,zc_linac1-linac_len/2.};
+}
+//============================================================================
+//============================================================================
+// linac solenoids positions
+REAL zc_sol_alin1 = 2.0775; // center of solenoid donstream of linac 1
+REAL zc_sol_alin2 = 4.7105; // center of solenoid donstream of linac 2
+REAL zc_sol_alin3 = 6.7772; // center of solenoid donstream of linac 3
+//============================================================================
+//============================================================================
+REAL sol_linac_len = 1.0; // axial length of the 2D map
+//============================================================================
+//============================================================================
+// solenoids (All 330 A maximum)
+REAL Isol_L1 = 0.0;
+REAL Isol_L2 = 0.0;
+REAL Isol_L3 = 0.0;
+//============================================================================
+//============================================================================
+REAL KSL1 = (Isol_L1/304.7875)*0.451972;
+REAL KSL2 = (Isol_L2/330.0000)*0.500875;
+REAL KSL3 = (Isol_L3/330.0000)*0.500875;
+//============================================================================
+//============================================================================
+sol_L1: Solenoid, L = 1.0, ELEMEDGE=0.0, KS = KSL1,
+FMAPFN = "../AWA_Fieldmap/DS4.T7",
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_sol_alin1-sol_linac_len/2.};
+sol_L2: Solenoid, L = 1.0, ELEMEDGE=0.0, KS = KSL2,
+FMAPFN = "../AWA_Fieldmap/DS5.T7",
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_sol_alin2-sol_linac_len/2.};
+sol_L3: Solenoid, L = 1.0, ELEMEDGE=0.0, KS = KSL3,
+FMAPFN = "../AWA_Fieldmap/DS5.T7",
+ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,zc_sol_alin3-sol_linac_len/2.};
+//============================================================================
+//============================================================================
+//============================================================================
+//============================================================================
+//Drift after gun (is not needed anymore)
+DR1: DRIFT, L = 1.4, ELEMEDGE = 0.2;
+DR2: DRIFT, L = 3.0, ELEMEDGE = 1.4;
+//============================================================================
+//============================================================================
+//Diagnostics
+Diag_YAG1: MONITOR, ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,3.1245};
+Diag_YAG2: MONITOR, ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,6.4325};
+Diag_YAG3: MONITOR, ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,9.6732};
+Diag_YAG4: MONITOR, ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,11.5558};
+Diag_Slit: MONITOR, ORIENTATION = {0.0,0.0,0.0}, ORIGIN = {0,0,15.1148};
+//============================================================================
+//============================================================================
+//============================================================================
+// Drift space
+//============================================================================
+// Drift space for Quadline
+REAL YAG4_POS = 11.5558; // YAG4 position  
+REAL Drif0Q = 2.175;
+REAL Drif1Q = 0.265;
+REAL Drif2Q = 0.250;
+REAL Drif3Q = 0.270;
+//============================================================================
+//============================================================================
+//Quadrupole magnet settings
+// This origin is for the center of the quadrupole magnet
+// IMP quad
+DQ4: QUADRUPOLE, L =0.12, ORIGIN = {0, 0, YAG4_POS + Drif0Q}, K1 = 0.000000001;
+DQ5: QUADRUPOLE, L =0.12, ORIGIN = {0, 0, YAG4_POS + Drif0Q + Drif1Q}, K1 = 0.000000001;
+DQ6: QUADRUPOLE, L =0.12, ORIGIN = {0, 0, YAG4_POS + Drif0Q + Drif1Q + Drif2Q}, K1 = 0.000000001;
+DQ7: QUADRUPOLE, L =0.12, ORIGIN = {0, 0, YAG4_POS + Drif0Q + Drif1Q + Drif2Q + Drif3Q}, K1 = 0.000000001;
+//============================================================================
+//============================================================================
+// DEFINE BEAMLINES
+Injector: Line = (photocathode, GUN, solBF, solM);
+//Linac: Line = (L1, Sol_L1, Diag_YAG1, L2, Sol_L2, L3, Diag_YAG2, Sol_L3, L4, L5, L6, Diag_YAG4); // if we use drive linac solenoid.
+Linac: Line = (L1, Diag_YAG1, L2, L3, Diag_YAG2, L4, L5, Diag_YAG3, L6, Diag_YAG4);
+Quadline: Line = (DQ4, DQ5, DQ6, DQ7, Diag_Slit);
+GSL: Line = (Injector, L1);
+AWA_Drivelinac:Line = (Injector, Linac);
+//============================================================================
+//============================================================================
+// INITIAL DISTRIBUTION
+DistFT: DISTRIBUTION, TYPE = FLATTOP,
+SIGMAX = 2.71E-3, // this is actually 2sigma -- radius for unif. distrib.
+SIGMAY = 2.71E-3, // this is actually 2sigma -- radius for unif. distrib.
+TRISE = 0.3e-12/2.35482*1.6869,
+TFALL = 0.3e-12/2.35482*1.6869, // see Tab14.11
+TPULSEFWHM = 6.0e-12,
+CUTOFFLONG = 4.0,
+NBIN = BINS,
+EMISSIONSTEPS = 500, // For convergence
+EMISSIONMODEL = ASTRA,
+EKIN = 0.55,
+EMITTED = True,
+WRITETOFILE = True;
+// Note on emission time step: FWHM pulse width divided by emission
+// steps gives the time step for the emissions process.
+// i.e 20.0e-12 / 100 gives a time step of 2e-13 (s) during emission.
+// This is the not the same as the time step used in rest of the file.
+//============================================================================
+//============================================================================
+FS_SC: Fieldsolver, FSTYPE = FFT,
+MX = MX, MY = MY, MT = MZ,
+PARFFTX = true,
+PARFFTY = true,
+PARFFTT = true,
+BCFFTX = open,
+BCFFTY = open,
+BCFFTT = open,
+BBOXINCR = 1,
+GREENSF = INTEGRATED;
+// ======================================================================================
+// Time step setting
+// linac tanks positions (start/end)
+REAL l1e = zc_linac1 + linac_len/2; // Linac1 end position
+REAL l2s = zc_linac2 - linac_len/2; // Linac2 start position
+REAL l2e = zc_linac2 + linac_len/2; // Linac2 end position
+REAL l3s = zc_linac3 - linac_len/2; // Linac3 start position
+REAL l3e = zc_linac3 + linac_len/2; // Linac3 end position
+REAL l4s = zc_linac4 - linac_len/2; // Linac4 start position
+REAL l4e = zc_linac4 + linac_len/2; // Linac4 end position
+REAL l5s = zc_linac5 - linac_len/2; // Linac5 start position
+REAL l5e = zc_linac5 + linac_len/2; // Linac5 end position
+REAL l6s = zc_linac6 - linac_len/2; // Linac6 start position
+REAL l6e = zc_linac6 + linac_len/2; // Linac6 end position
+//----------------------------------------------------------------------------
+// Electron Beam Definition
+BEAM1: BEAM, PARTICLE = ELECTRON, pc = P0, NPART = n_particles,
+BFREQ = rf_freq * 1E-6, BCURRENT = beam_bunch_charge * rf_freq, CHARGE = -1;
+TRACK, LINE = AWA_Drivelinac, BEAM = BEAM1, MAXSTEPS = 10000000, 
+//DT   = {dTg, dTd, dTg, dTd, dTg, dTd, dTd, dTd, dTg, dTd, dTd, dTd,   dTd,   dTd,   dTd,   dTd,   dTd,   dTd,    dTd,     dTq,     dTd,     dTq,     dTd,     dTq,     dTd,    dTq,     dTd}, 
+//ZSTOP= {l1e, l2s, l2e, l3s, l3e, l4s, l4e, l5s, l5e, l6s, l6e, 12.35, 12.37, 12.54, 12.62, 12.78, 13.00, 13.165, 13.715 , 13.855 , 13.965 , 14.135 , 14.215 , 14.385 , 14.465 ,14.665 , 16.6798 } // DYG5 is at 16.6798 m.
+DT   = {dTg, dTd,    dTq,    dTd, dTg, dTd, dTg, dTd,    dTq,    dTd, dTd, dTd, dTg, dTd,    dTq,    dTd, dTd, dTd,     dTq,     dTd,   dTd,   dTd,   dTd,   dTd,   dTd,   dTd,    dTd,     dTq,     dTd,     dTq,     dTd,     dTq,     dTd,    dTq,     dTd,     dTq,     dTd}, 
+ZSTOP= {l1e, 3.1145, 3.1345, l2s, l2e, l3s, l3e, 6.4225, 6.4425, l4s, l4e, l5s, l5e, 9.6632, 9.6832, l6s, l6e, 11.5458, 11.5658, 12.35, 12.37, 12.54, 12.62, 12.78, 13.00, 13.165, 13.715 , 13.855 , 13.965 , 14.135 , 14.215 , 14.385 , 14.465 ,14.665 , 15.1048, 15.1248, 16.6798 }; // DYG5 is at 16.6798 m.
+RUN, METHOD = "PARALLEL-T", BEAM = BEAM1,
+FIELDSOLVER = FS_SC, DISTRIBUTION = DistFT;
+ENDTRACK;
